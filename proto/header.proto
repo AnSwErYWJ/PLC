@@ -1,0 +1,7 @@
+message header
+{
+	required int32 message_id = 1;
+	required int32 message_flag = 2;
+}
+
+

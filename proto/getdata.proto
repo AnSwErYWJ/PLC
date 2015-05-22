@@ -1,0 +1,14 @@
+message SensorInfo
+{
+	required int32 Roomid = 1;
+	required float Temperature = 2;
+	required float Humidity = 3;
+	required float Co2 = 4;
+	optional float Light = 5;
+}
+
+message SensorT
+{
+	required int32 Roomid = 1;
+	required float Temperature = 2;
+}

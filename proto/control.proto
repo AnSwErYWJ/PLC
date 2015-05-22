@@ -1,0 +1,13 @@
+message Controller_state
+{
+	required  int32 Ctrl_id = 1;
+	required  int32 Ctrl_state = 2;
+}
+
+message Controller_back
+{
+	required  int32 Ctrl_id = 1;
+	required  int32 Ctrl_state = 2;
+	required  int32 Ctrl_success = 3;
+}
+
