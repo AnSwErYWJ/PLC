@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 Data Collection Usage
 ===
 
@@ -18,3 +19,6 @@ $sudo ./restart.sh
 The history data will be saved in backup named with date.
 
  
+=======
+# PLC
+>>>>>>> d4b87b1d9bc25af05eb3b592cc9cd542ae988df8
