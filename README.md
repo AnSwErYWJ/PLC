@@ -4,16 +4,9 @@
 ##Data Collection Usage
 
 ###Complie and run
-
-```
-$make 
-$sudo ./Serial [ipaddress]
-```
+    $make 
+    $sudo ./Serial [ipaddress]
 
 ###Environment and configure
-```
-complie in ubuntu of my pc using arm-linux-gcc
-run in linux of ARM9 
-```
-
- 
+    complie in ubuntu of my pc using arm-linux-gcc
+    run in linux of ARM9 
