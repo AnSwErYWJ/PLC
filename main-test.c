@@ -17,7 +17,7 @@
 #include <signal.h>
 #include <netdb.h>
 #include <sys/select.h>
-
+#include <time.h>
 
 #define BUFSIZE  1024
 #define MAXSLEEP 128
@@ -64,7 +64,6 @@ struct MsgSend MS;
 //	char *flag;
 //	int len;
 //	void *buf;
-//}
 
 //struct IMsg IM;
 
@@ -78,14 +77,25 @@ void *buf_mh;
 void *buf_st;
 void *buf_si;
 
+
+void printf_log(int id, int raw, float trans)
+{
+
+	(void)time(&the_time);
+	fprintf(stderr,"[Get] Time %s\n",ctime(&the_time));
+	fprintf(stderr,"[Get] SensorId:%d|RawData %d|TransData %.2f\n",id,raw,trans);
+}
+
 float T1_trans(int id)
 {	
     int data;
     float ret;
 
+	srand((unsigned)time(NULL));
     sensor_get(ss,id,&data);
+	data+=rand()%1;
     ret = (float)(data * 120/1000);
-
+	printf_log(id,data,ret);
     return ret;
 
 }
@@ -95,8 +105,11 @@ float H_trans(int id)
     int data;
     float ret;
 
+	srand((unsigned)time(NULL));
     sensor_get(ss,id,&data);
+	data+= rand()%1;
     ret = (float)(data / 10);
+	printf_log(id,data,ret);
 
     return ret;
 }
@@ -106,8 +119,11 @@ float Co2_trans(int id)
     int data;
     float ret;
 
+	srand((unsigned)time(NULL));
     sensor_get(ss, id,&data);
+	data+= rand()%1;
     ret = (float)(data * 10);
+	printf_log(id,data,ret);
 
 	return ret;
 }
@@ -117,8 +133,11 @@ float L_trans(int id)
     int data;
     float ret;
 
+	srand((unsigned)time(NULL));
     sensor_get(ss,id,&data);
+	data+= rand()%1;
     ret = (float)(data * 10);
+	printf_log(id,data,ret);
 
     return ret;
 }
@@ -128,8 +147,11 @@ float T2_trans(int id)
     int data;
     float ret;
 
+	srand((unsigned)time(NULL));
     sensor_get(ss,id,&data);
+	data += rand()%1;
     ret = (float)((data - 30000/110)*110 / 1000);
+	printf_log(id,data,ret);
 
     return ret;
 }
@@ -168,9 +190,9 @@ void Calc_data(int room[],int len)
             default:
             data = T2_trans(room[i]);
             break;
-        } 
+         } 
         room_info[i] = data;
-    }
+    } 
 }
 void Write_into_file(float room[], int len)
 {
@@ -482,6 +504,12 @@ void Send_data(int id)
 //}   
 //
 
+void printf_info(int id)
+{
+	(void)time(&the_time);
+	fprintf(stderr,"[send] room:%d|time:%s\n",id,ctime(&the_time));
+}
+
 void Get_data(void)
 {
     int  len;
@@ -523,24 +551,27 @@ void Get_data(void)
     //sleep(2);
 
     Send_data(1); //here used to send room1 data
+	printf_info(1);
     sleep(3);
 
     fputs("Room2:\n",fp);
     len = sizeof(Sensor_TrainRoom2)/sizeof(Sensor_TrainRoom2[0]);
     Calc_data(Sensor_TrainRoom2,len);
     Write_into_file(room_info,len);
-    //makeup_data(2,len);
+    // makeup_data(2,len);
     //Send_data(1); //room 2 data
+	//printf_info(2); //print log info
     //sleep(3);
     fputs("Room3:\n",fp);
     len = sizeof(Sensor_TrainRoom3)/sizeof(Sensor_TrainRoom3[0]);
-Calc_data(Sensor_TrainRoom3,len);
-Write_into_file(room_info,len);
-//makeup_data(3,len);
-//Send_data(1); //room 3 data
-//sleep(3);
-fputs("\n",fp);
-fclose(fp);
+	Calc_data(Sensor_TrainRoom3,len);
+	Write_into_file(room_info,len);
+	//makeup_data(3,len);
+	//Send_data(1); //room 3 data
+	//printf_info(3);
+	//sleep(3);
+	fputs("\n",fp);
+	fclose(fp);
 
 }
 
@@ -554,6 +585,12 @@ void *Sensor_data(void *arg)
     } 
 }
 
+void printf_info2(int id, int state)
+{
+	(void)time(&the_time);
+	fprintf(stderr,"[Control] Time:%s\n",ctime(&the_time));
+	fprintf(stderr,"[Control] ControllerId:%d|State:%d\n",id,state);
+}
 
 /*get controll state*/
 void *Control_controller(void *arg)
@@ -604,13 +641,14 @@ void *Control_controller(void *arg)
                 send(fd,ret_buf,ret_length,0);
             }else
             {
-                controller_get(ss,Cs->ctrl_id,&state);
+                //controller_get(ss,Cs->ctrl_id,&state);
+				printf_info2(Cs->ctrl_id,Cs->ctrl_state);
                 Cb.ctrl_success = 1;
                 ret_length = controller_back__get_packed_size(&Cb);
                 ret_buf = malloc(ret_length);
                 controller_back__pack(&Cb,ret_buf);
                 send(fd,ret_buf,ret_length,0);
-                //printf("set successfully!The %d's status is %d\n",Cs->ctrl_id,state);
+                printf("set successfully!The %d's status is %d\n",Cs->ctrl_id,Cs->ctrl_state);
             } 
         }else
         {
