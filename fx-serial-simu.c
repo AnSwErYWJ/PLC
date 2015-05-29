@@ -56,7 +56,6 @@ void no_op(){}
 #define LOCK(x) pthread_mutex_lock(&x)
 #define UNLOCK(x) pthread_mutex_unlock(&x)
 
-time_t cur_times;
 typedef enum bool_ {
 	false,
 	true
@@ -470,7 +469,6 @@ static int _open_device(struct fx_serial *s, char *device)
 
 	memset(s, 0, sizeof(*s));
 	strcpy(s->device, device);
-
 	s->fd = open(device, O_RDWR | O_NOCTTY | O_NDELAY);
 	if (s->fd == -1) {
 		DEBUG("fd = %d, %s\n", s->fd, strerror(errno));
@@ -478,6 +476,7 @@ static int _open_device(struct fx_serial *s, char *device)
 	}
 
 	s->req = malloc(sizeof(ptable));
+	
 	create(s->req);
 	
 	return 0;
@@ -715,7 +714,8 @@ struct fx_serial* fx_serial_start()
 	struct fx_serial *s = malloc(sizeof(struct fx_serial));
 	assert(s);
 	int ret;
-	ret = _open_device(s, "/dev/ttyUSB0");
+	
+	ret = _open_device(s, "/dev/ttyS0");
 	assert(ret == 0);
 	
 	ret = _set_device(s, 9600, '7', 'E', '1');
@@ -857,11 +857,11 @@ static int getWriteCommandFrame(char *buf, int *sz, int address, int num, char *
 
 	*sz = 8+num*2+3;
 
-	//for (i = 0; i < *sz; i++) {
-//		printf("%02x ", buf[i]);
-	//}
+/*	for (i = 0; i < *sz; i++) {
+		printf("%02x ", buf[i]);
+	}
 
-//	printf("\n");
+	printf("\n");*/
 
 	return 0;
 }
@@ -872,6 +872,9 @@ static int _cb_async(int fd, char *buf, int sz)
 	write(fd, buf, sz);
 	return 0;
 }
+
+
+
 
 int controller_set(struct fx_serial *s, int id, int status)
 {
@@ -916,12 +919,12 @@ int controller_set(struct fx_serial *s, int id, int status)
 	} 
 
 	sz = read(fd[0], buf, 255);
-	int i;
-	//for (i = 0; i < sz; i++) {
-	//	printf("%02x ", buf[i]);
-//	}
+	/*int i;
+	for (i = 0; i < sz; i++) {
+		printf("%02x ", buf[i]);
+	}*/
 
-	//printf("\n");
+	printf("\n");
 	close(fd[0]);
 	close(fd[1]);
 
@@ -938,15 +941,12 @@ int controller_get(struct fx_serial *s, int id, int *status)
 	getReadCommandFrame(sc.buf, &sc.sz, id, 1);
 
 	int fd[2];
-	FILE *fp_controller;
 	pipe(fd);
 
 	sc.fd = fd[1];	
 	sc.cb = _cb_async;
 	serial_command(s, &sc);
-	fp_controller = fopen("controller_rawlog.txt","a+");
-	(void)time(&cur_times);
-
+	
 	char buf[255];
 	int  sz;
 	int  ret; /*select return*/
@@ -961,21 +961,19 @@ int controller_get(struct fx_serial *s, int id, int *status)
 		printf("select error\n");
 		return -1;
 	}else if(ret == 0){
-		printf("filedes are not ready for read within 5s\n");
+//		printf("filedes are not ready for read within 5s\n");
 		return -1;
 	}
 	sz = read(fd[0], buf, 255);
-		
-	fprintf(fp_controller,"Time:%s\n",ctime(&cur_times));
+	
 	int i;
 	for (i = 0; i <  sz; i++) {
-		fprintf(fp_controller,"%02x ", buf[i]);
+		printf("%02x ", buf[i]);
 	} 
-	fprintf(fp_controller,"\n");
-	
+
+	printf("\n");
 	close(fd[0]);
 	close(fd[1]);
-	fclose(fp_controller);
 
 //	printf("buf[2] = %x\n", buf[2]);
 	if (buf[2] == 0x31) {
@@ -1045,7 +1043,7 @@ static char i_to_hex(int x)
 		case 13: return 'D'; break;
 		case 14: return 'E'; break;
 		case 15: return 'F'; break;
-	} 
+	}
 }
 
 static void integer_to_buf4(int x, char *buf)
@@ -1087,7 +1085,7 @@ int sensor_set(struct fx_serial *s, int id, int data)
 	tv.tv_sec = 2;
 	tv.tv_usec = 0;
 	
-	if ((ret = select((fd[0]+1),&readset,NULL,NULL,&tv)) < 0){
+	if((ret = select((fd[0]+1),&readset,NULL,NULL,&tv)) < 0){
 		printf("select error\n");
 		return -1;
 	}else if(ret == 0){
@@ -1113,7 +1111,6 @@ int sensor_get(struct fx_serial *s, int id, int *data)
 	getReadCommandFrame(sc.buf, &sc.sz, id, 1);
 
 	int fd[2];
-	FILE *fp_sensor;
 	pipe(fd);
 
 	sc.fd = fd[1];	
@@ -1123,9 +1120,6 @@ int sensor_get(struct fx_serial *s, int id, int *data)
 	char buf[255];
 	int sz;
 	int ret; /*select return value*/
-	fp_sensor = fopen("sensor_raw.txt","a+");
-	(void)time(&cur_times);
-
 	struct timeval tv;
 	fd_set readset;
 
@@ -1134,24 +1128,23 @@ int sensor_get(struct fx_serial *s, int id, int *data)
 	tv.tv_sec = 2;
 	tv.tv_usec = 0;
 	
-	if( (ret = select((fd[0]+1),&readset,NULL,NULL,&tv)) < 0){
+	if((ret = select((fd[0]+1),&readset,NULL,NULL,&tv)) < 0){
 		printf("select error\n");
 		return -1;
 	}else if(ret == 0){
-		printf("filedes not ready\n");
+	printf("filedes not ready\n");
 		return -1;
 	} 
 
 	sz = read(fd[0], buf, 255);
-	fprintf(fp_sensor,"Time:%s",ctime(&cur_times));
-	int i;
+/*	int i;
 	for (i = 0; i < sz; i++) {
-		fprintf(fp_sensor,"%02x ", buf[i]);
-	}
-	fprintf(fp_sensor,"\n");
+		printf("%02x ", buf[i]);
+	}*/
+
+//	printf("\n");
 	close(fd[0]);
 	close(fd[1]);
-	fclose(fp_sensor);
 
 	int x;
 	buf4_to_integer(&buf[1], &x);

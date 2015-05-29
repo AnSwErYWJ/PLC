@@ -1,4 +1,4 @@
-/*Version: auto run,choose roomId, data from file*/
+/*Version: auto run, get from simu*/
 #include <stdio.h>
 #include <stdlib.h>
 #include "fx-serial.h"
@@ -17,19 +17,10 @@
 #include <signal.h>
 #include <netdb.h>
 #include <sys/select.h>
-
+#include <time.h>
 
 #define BUFSIZE  1024
 #define MAXSLEEP 128
-
-#if defined(DEBUG_PRINT)
-#define DEBUG(...) \
-        do{ \
-           fprintf(stderr,"[DEBUG]:%s:%s:%s():",__FILE__,__LINE__,__FUNCTION__);\
-           fprintf(stderr,__VA_ARGS__);\
-
-          }while(0)
-#endif
 struct fx_serial *ss;
 time_t the_time;
 FILE   *fp;
@@ -73,7 +64,6 @@ struct MsgSend MS;
 //	char *flag;
 //	int len;
 //	void *buf;
-//}
 
 //struct IMsg IM;
 
@@ -87,14 +77,25 @@ void *buf_mh;
 void *buf_st;
 void *buf_si;
 
+
+void printf_log(int id, int raw, float trans)
+{
+
+	(void)time(&the_time);
+	fprintf(stderr,"[Get] Time %s\n",ctime(&the_time));
+	fprintf(stderr,"[Get] SensorId:%d|RawData %d|TransData %.2f\n",id,raw,trans);
+}
+
 float T1_trans(int id)
 {	
     int data;
     float ret;
 
+	srand((unsigned)time(NULL));
     sensor_get(ss,id,&data);
-    ret = (float)data * 120/1000;
-
+	data+=rand()%1;
+    ret = (float)(data * 120/1000);
+	printf_log(id,data,ret);
     return ret;
 
 }
@@ -104,8 +105,11 @@ float H_trans(int id)
     int data;
     float ret;
 
+	srand((unsigned)time(NULL));
     sensor_get(ss,id,&data);
-    ret = (float)data / 10;
+	data+= rand()%1;
+    ret = (float)(data / 10);
+	printf_log(id,data,ret);
 
     return ret;
 }
@@ -115,10 +119,13 @@ float Co2_trans(int id)
     int data;
     float ret;
 
+	srand((unsigned)time(NULL));
     sensor_get(ss, id,&data);
-    ret = (float)data * 10;
-    return ret;
+	data+= rand()%1;
+    ret = (float)(data * 10);
+	printf_log(id,data,ret);
 
+	return ret;
 }
 
 float L_trans(int id)
@@ -126,8 +133,11 @@ float L_trans(int id)
     int data;
     float ret;
 
+	srand((unsigned)time(NULL));
     sensor_get(ss,id,&data);
-    ret = (float)data * 10;
+	data+= rand()%1;
+    ret = (float)(data * 10);
+	printf_log(id,data,ret);
 
     return ret;
 }
@@ -137,8 +147,11 @@ float T2_trans(int id)
     int data;
     float ret;
 
+	srand((unsigned)time(NULL));
     sensor_get(ss,id,&data);
-    ret = ((float)data - 30000/110)*110 / 1000;
+	data += rand()%1;
+    ret = (float)((data - 30000/110)*110 / 1000);
+	printf_log(id,data,ret);
 
     return ret;
 }
@@ -177,9 +190,9 @@ void Calc_data(int room[],int len)
             default:
             data = T2_trans(room[i]);
             break;
-        } 
+         } 
         room_info[i] = data;
-    }
+    } 
 }
 void Write_into_file(float room[], int len)
 {
@@ -202,7 +215,6 @@ void single_sensor(float temperature,int id)
     st_length = sensor_t__get_packed_size(&MS.st);
     buf_st = malloc(st_length);
     sensor_t__pack(&MS.st,buf_st);
-    //DEBUG("Serialize successfully");
     //fwrite(buf_st,st_length,1,stdout);
     //putchar('\n');
 }
@@ -224,7 +236,6 @@ void sensordata_pack(float T, float H, float Co2)
     si_length = sensor_info__get_packed_size(&MS.si);
     buf_si = malloc(si_length);
     sensor_info__pack(&MS.si,buf_si);
-    //DEBUG("Serialize successfully");
     //printf("sensor_info:%s\n",(char *)buf_si);
 
     //Seni = sensor_info__unpack(NULL,si_length,buf_si);
@@ -358,8 +369,8 @@ int socket_set_keepalive(int fd)
 
 }
 
-/*for test*/
-void unpackmsg(char *buf)
+
+/*void unpackmsg(char *buf)
 {
     char header[100];
     char info[100];
@@ -393,31 +404,35 @@ void unpackmsg(char *buf)
         sensor_info__free_unpacked(Seni,NULL);
     } 
     printf("=================\n");
-}
+}*/
 
 void Send_data(int id)
 {
-    int len, ret;
+    int len, ret,slen;
     void *buf,*index;
 
     init_msgheader(id);
     if(id == 1)
     {
         len = 8+2+mh_length+si_length;
+        slen = 8+mh_length+si_length;
         buf = malloc(len);
         index = buf;
-        sprintf(buf,"%s%d","MUSHROOM",si_length);
+        sprintf(buf,"%d%s",slen,"MUSHROOM");
         index += strlen(buf); //move to the end
         memmove((void *)index,buf_mh,mh_length);
         index += mh_length;
         memmove((void *)index,buf_si,si_length);
+        //printf("%d\n",len);
         free(buf_si);
     }else if(id == 2)
     {
         len = 8+2 + mh_length +st_length;
+        slen = 8+mh_length+st_length;
         buf = malloc(len+10);
-        sprintf(buf,"%s%d","MUSHROOM",st_length);
+        
         index = buf;
+		sprintf(buf,"%d%s",slen,"MUSHROOM");
         index += strlen(buf); //move to the end
         memmove((void *)index,buf_mh,mh_length);
         //strcat(buf,buf_st);
@@ -488,78 +503,11 @@ void Send_data(int id)
 //free(buf_mh);
 //}   
 //
-void printf_log(int id,int size)
-{
-    printf("[get]room:%d|quantities:%d\n",id,size);
-}
-
-void dumproom_info(int start, int end, int buf[])
-{
-    int i,j;
-    j = start;
-    for(i = 0; i<=(end -start);i++)
-    {  
-        room_info[i] = buf[j];
-        j += 1;
-    }
-}
-
-
-
-//This function is used to imitation
-void rand_data(int id)
-{
-    FILE *fpp;
-    int  i;
-    char buf[1024];
-    int realbuf[22];//string convert to intger
-    char whitespace[] = " ";
-    char *token;
-
-
-    fpp = fopen("testdata.txt","a+");
-    fgets(buf,1024,fpp);
-
-    token=strtok(buf,whitespace);
-    for(i = 0; i<22;i++)
-    { 
-        if(token != NULL)
-        realbuf[i] = atoi(token);
-        token = strtok(NULL,whitespace);
-    } 
-
-    //for(i =0;i <22;i++)
-    //printf("%d  ",realbuf[i]);
-
-    //printf("\n");
-    switch(id)
-    {
-        case 1:
-        printf_log(1,12);
-        dumproom_info(4,13,realbuf);
-        break;
-        case 2:
-        printf_log(2,4);
-        dumproom_info(14,17,realbuf);
-        break;
-        case 3:
-        printf_log(3,4);
-        dumproom_info(18,21,realbuf);
-        break;
-        default:
-        printf_log(4,1);
-        printf_log(5,1);
-        dumproom_info(0,3,realbuf);
-
-    }
-    fclose(fpp);
-}
 
 void printf_info(int id)
 {
-    (void)time(&the_time);
-    fprintf(stderr,"[send]:room:%d|time:%s",id,ctime(&the_time));
-
+	(void)time(&the_time);
+	fprintf(stderr,"[send] room:%d|time:%s\n",id,ctime(&the_time));
 }
 
 void Get_data(void)
@@ -572,7 +520,7 @@ void Get_data(void)
     fp = fopen("sensordata.txt","a+");
     if(fp == NULL)
     {
-        fprintf(stderr,"Open file error\n");
+        fprintf(stderr,"Open datafile error\n");
         exit(1);
     } 
 
@@ -580,8 +528,7 @@ void Get_data(void)
 
     fputs("Room1 Light:\n",fp);
     len = sizeof(Sensor_light_Room1)/sizeof(Sensor_light_Room1[0]);
-    //Calc_data(Sensor_light_Room1,len);
-    rand_data(4);
+    Calc_data(Sensor_light_Room1,len);
     Write_into_file(room_info,len);
     for(i = 0; i < len; i++)
     {
@@ -591,118 +538,150 @@ void Get_data(void)
 
     fputs("Room1:\n",fp);
     len = sizeof(Sensor_TrainRoom1)/sizeof(Sensor_TrainRoom1[0]);
-    //Calc_data(Sensor_TrainRoom1,len);
-    rand_data(1);
+    Calc_data(Sensor_TrainRoom1,len);
     Write_into_file(room_info,len);
     makeup_data(1,len);	
 
     //send the first two single sensor room
-    single_sensor(room_info[0],4); //room_id is 4
-    Send_data(2);
-    printf_info(4);
-    sleep(3);
-    single_sensor(room_info[1],5); //room_id is 5
-    Send_data(2);
-    printf_info(5);
-    sleep(2);
+   //# single_sensor(room_info[0],4); //room_id is 4
+    //#Send_data(2);
+    //#sleep(3);
+    //single_sensor(room_info[1],5); //room_id is 5
+    //Send_data(2);
+    //sleep(2);
 
     Send_data(1); //here used to send room1 data
-    printf_info(1);
+	printf_info(1);
     sleep(3);
 
     fputs("Room2:\n",fp);
     len = sizeof(Sensor_TrainRoom2)/sizeof(Sensor_TrainRoom2[0]);
-    /* Calc_data(Sensor_TrainRoom2,len); */
-    rand_data(2);
-Write_into_file(room_info,len);
-makeup_data(2,len);
-Send_data(1); //room 2 data
-printf_info(2);
-sleep(3);
-fputs("Room3:\n",fp);
-len = sizeof(Sensor_TrainRoom3)/sizeof(Sensor_TrainRoom3[0]);
-//Calc_data(Sensor_TrainRoom3,len);
-rand_data(3);
-Write_into_file(room_info,len);
-makeup_data(3,len);
-Send_data(1); //room 3 data
-printf_info(3);
-sleep(3);
-fputs("\n",fp);
-fclose(fp);
+    Calc_data(Sensor_TrainRoom2,len);
+    Write_into_file(room_info,len);
+    // makeup_data(2,len);
+    //Send_data(1); //room 2 data
+	//printf_info(2); //print log info
+    //sleep(3);
+    fputs("Room3:\n",fp);
+    len = sizeof(Sensor_TrainRoom3)/sizeof(Sensor_TrainRoom3[0]);
+	Calc_data(Sensor_TrainRoom3,len);
+	Write_into_file(room_info,len);
+	//makeup_data(3,len);
+	//Send_data(1); //room 3 data
+	//printf_info(3);
+	//sleep(3);
+	fputs("\n",fp);
+	fclose(fp);
 
 }
 
 
-//void *Sensor_data(void *arg)
-//{
-//	while(1)
-//	{
-//		Get_data();
-//		sleep(5); //sleep 5 mins
-//	 } 
-//}
+void *Sensor_data(void *arg)
+{
+    while(1)
+    {
+        Get_data();
+        sleep(5); //sleep 5 mins
+    } 
+}
+
+void printf_info2(int id, int state)
+{
+	(void)time(&the_time);
+	fprintf(stderr,"[Control] Time:%s\n",ctime(&the_time));
+	fprintf(stderr,"[Control] ControllerId:%d|State:%d\n",id,state);
+}
 
 /*get controll state*/
 void *Control_controller(void *arg)
 {
     ControllerState *Cs;
     char buffer[100];
-    int  ret,state;
+    int  ret,state,ret_length;
+    ControllerBack Cb;
+
+    controller_back__init(&Cb);
 
     while(1)
     {
+        void *ret_buf;
+        FILE *fp_log;
+        (void)time(&the_time);
+        fp_log=fopen("simudata.txt","a+");
+         if(fp_log == NULL)
+         {
+             fprintf(stderr,"Open logfile error\n");
+         }
         Reget:
-        if(FD_ISSET(fd,&rset))
+        //if(FD_ISSET(fd,&rset))
+        //{
+        if((ret = read(fd,buffer,sizeof(buffer))) < 0)
         {
-            if((ret = read(fd,buffer,sizeof(buffer))) < 0)
+            fprintf(stderr,"cannot get the msg from server\n");
+            continue;
+        }
+        //fwrite(buffer,sizeof(buffer),1,stdout);
+        Cs = controller_state__unpack(NULL,ret,buffer);    
+        fputs(ctime(&the_time),fp_log);
+        fprintf(fp_log,"%s","id:");
+        fprintf(fp_log,"%d\n",Cs->ctrl_id);
+        fprintf(fp_log,"%s","state:");
+        fprintf(fp_log,"%d\n",Cs->ctrl_state);
+        if(Cs->ctrl_id >= 55 && Cs->ctrl_id <= 82)
+        {
+            Cb.ctrl_id = Cs->ctrl_id;
+            Cb.ctrl_state = Cs->ctrl_state;
+            if(controller_set(ss,Cs->ctrl_id,Cs->ctrl_state) < 0)
             {
-                fprintf(stderr,"cannot get the msg from server\n");
-                continue;
-            }
-            //fwrite(buffer,sizeof(buffer),1,stdout);
-            Cs = controller_state__unpack(NULL,ret,buffer);
-            if(Cs->ctrl_id >= 55 && Cs->ctrl_id <= 82)
+                printf("cannot open No.%d controller\n",Cs->ctrl_id);
+                Cb.ctrl_success = 0;
+                ret_length = controller_back__get_packed_size(&Cb);
+                ret_buf = malloc(ret_length);
+                controller_back__pack(&Cb,ret_buf);
+                send(fd,ret_buf,ret_length,0);
+            }else
             {
-                if(controller_set(ss,Cs->ctrl_id,Cs->ctrl_state) < 0)
-                {
-                    printf("cannot open No.%d controller\n",Cs->ctrl_id);
-                    send(fd,"0",sizeof("0"),0);
-                }//else
-                //			{
-                //				controller_get(ss,Cs->ctrl_id,&state);
-                //				printf("%d's status is %d\n",Cs->ctrl_id,state);
-                //				send(fd,"1",sizeof("1"),0);
-                //			} 
-                //		}
-                //		else
-                //		{
-                //			send(fd,"0",sizeof("0"),0);
-                //			goto Reget;
-                //		}
-                //	controller_state__free_unpacked(Cs,NULL);
-                //	sleep(2);
-            }
-            //
-        } 
-    }
+                //controller_get(ss,Cs->ctrl_id,&state);
+				printf_info2(Cs->ctrl_id,Cs->ctrl_state);
+                Cb.ctrl_success = 1;
+                ret_length = controller_back__get_packed_size(&Cb);
+                ret_buf = malloc(ret_length);
+                controller_back__pack(&Cb,ret_buf);
+                send(fd,ret_buf,ret_length,0);
+                printf("set successfully!The %d's status is %d\n",Cs->ctrl_id,Cs->ctrl_state);
+            } 
+        }else
+        {
+            Cb.ctrl_success = 0;
+            ret_length = controller_back__get_packed_size(&Cb);
+            ret_buf = malloc(ret_length);
+            controller_back__pack(&Cb,ret_buf);
+            send(fd,ret_buf,ret_length,0);
+            goto Reget;
+        }
+        controller_state__free_unpacked(Cs,NULL);
+        free(ret_buf);
+        fclose(fp_log);
+        sleep(2);
 }
 
-        int connect_retry(int sockfd, const struct sockaddr *addr,socklen_t alen)
-        {
-            int nesc;
+}
 
-            for(nesc = 1; nesc <= MAXSLEEP; nesc <<= 1)
-            { 
-                if(connect(sockfd, addr,alen) == 0)
-                return(0);
-                if(nesc <= MAXSLEEP/2)
-                sleep(nesc);
-            }
+int connect_retry(int sockfd, const struct sockaddr *addr,socklen_t alen)
+{
+    int nesc;
+
+    for(nesc = 1; nesc <= MAXSLEEP; nesc <<= 1)
+    { 
+        if(connect(sockfd, addr,alen) == 0)
+        return(0);
+        if(nesc <= MAXSLEEP/2)
+        sleep(nesc);
+    }
 
 
-            return -1;
-        }
+    return -1;
+}
 
 void free_space(int signo)
 {
@@ -722,7 +701,7 @@ int main(int argc, const char *argv[])
     FD_SET(fd,&wset);
     FD_SET(fd,&rset);
 
-    //ss = fx_serial_start();TODO:here need to recover
+    ss = fx_serial_start();
     fd = client_init(7000,argv[1]);
     select(fd+1,&rset,&wset,NULL,NULL);
 
@@ -758,12 +737,11 @@ int main(int argc, const char *argv[])
         header__init(&MS.mh);
         sensor_info__init(&MS.si);
         sensor_t__init(&MS.st);
-        /*TODO:here need to recover*/ 
         Get_data();
-        printf("5 mins later send again...\n");
+	//test();
         sleep(293); //sleep 5 mins
     } 
-//err = pthread_create(&show_data,NULL,Sensor_data,NULL);
+    //err = pthread_create(&show_data,NULL,Sensor_data,NULL);
 //if(err != 0)
 //	{
 //	fprintf(stderr,"cannot create the thread\n");
